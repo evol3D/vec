@@ -36,6 +36,8 @@
 #define VEC_GROWTH_RATE 3 / 2
 #endif
 
+#include <stddef.h>
+
 typedef void *vec_t;
 
 /*!
@@ -377,6 +379,7 @@ vec_clear(
   }
 
   metadata->length = 0;
+  return 0;
 }
 
 int
