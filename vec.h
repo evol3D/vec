@@ -4,6 +4,24 @@
 #ifndef EV_VEC_HEADER
 #define EV_VEC_HEADER
 
+#ifdef VEC_DLL
+    #if defined(_WINDOWS) || defined(_WIN32)
+        #if defined (VEC_IMPL)
+            #define VEC_API __declspec(dllexport)
+        #else
+            #define VEC_API __declspec(dllimport)
+        #endif
+    #elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+        #if defined (VEC_IMPL)
+            #define VEC_API __attribute__((visibility("default")))
+        #else
+            #define VEC_API
+        #endif
+    #endif
+#else
+    #define VEC_API
+#endif
+
 #ifndef VEC_INIT_CAP
 /*!
  * \brief Initial capacity that is first reserved when a vector is initialized
@@ -60,7 +78,7 @@ typedef void (*elem_destr)(void *d);
  *
  * \returns A vector object
  */
-vec_t
+VEC_API vec_t
 vec_init_impl(
   size_t elemsize, 
   elem_copy copy, 
@@ -80,7 +98,7 @@ vec_init_impl(
  *
  * \returns A pointer to the first element in a vector
  */
-void *
+VEC_API void *
 vec_iter_begin(
   vec_t v);
 
@@ -89,7 +107,7 @@ vec_iter_begin(
  *
  * \returns A pointer to the memory block right after the last element in the vector
  */
-void *
+VEC_API void *
 vec_iter_end(
   vec_t v);
 
@@ -100,7 +118,7 @@ vec_iter_end(
  * \param v The vector that is being iterated over
  * \param iter Reference to the iterator that is being incremented
  */
-void
+VEC_API void
 vec_iter_next(
   vec_t v, 
   void **iter);
@@ -115,7 +133,7 @@ vec_iter_next(
  *
  * \param v The vector that is being destroyed
  */
-void
+VEC_API void
 vec_fini(
   vec_t v);
 
@@ -132,7 +150,7 @@ vec_fini(
  *
  * \returns An error code. If the operation was successful, then `0` is returned.
  */
-int
+VEC_API int
 vec_push(
   vec_t *v, 
   void *val);
@@ -144,7 +162,7 @@ vec_push(
  *
  * \returns Current length of the vector
  */
-size_t
+VEC_API size_t
 vec_len(
   vec_t v);
 
@@ -155,7 +173,7 @@ vec_len(
  *
  * \returns Current capacity of the vector
  */
-size_t
+VEC_API size_t
 vec_capacity(
   vec_t v);
 
@@ -167,7 +185,7 @@ vec_capacity(
  *
  * \returns 0 on success
  */
-int
+VEC_API int
 vec_clear(
   vec_t v);
 
@@ -183,7 +201,7 @@ vec_clear(
  *
  * \returns 0 on success
  */
-int
+VEC_API int
 vec_setlen(
   vec_t *v, 
   size_t len);
@@ -196,7 +214,7 @@ vec_setlen(
  *
  * \returns 0 on success
  */
-int
+VEC_API int
 vec_setcapacity(
   vec_t *v, 
   size_t cap);
@@ -208,7 +226,7 @@ vec_setcapacity(
  *
  * \returns 0 on success
  */
-int
+VEC_API int
 vec_grow(
   vec_t *v);
 
