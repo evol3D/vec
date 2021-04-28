@@ -389,12 +389,14 @@ vec_pop(
 {
   __GET_METADATA__(*v)
 
-  void *src = ((char *)*v) + ((metadata->length-1) * metadata->elemsize)
+  void *src = ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
+
   if (metadata->copy_fn) {
     metadata->copy_fn(out, src);
   } else {
     memcpy(out, src, metadata->elemsize);
   }
+
   metadata->length--;
 
   return 0;
@@ -410,7 +412,7 @@ vec_last(
     return NULL;
   }
 
-  return ((char *)*v) + ((metadata->length-1) * metadata->elemsize)
+  return ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
 }
 
 size_t
