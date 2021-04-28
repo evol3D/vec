@@ -150,7 +150,8 @@ vec_fini(
  * \param val A pointer to the element that is to be copied to the end of the
  * vector
  *
- * \returns An error code. If the operation was successful, then `0` is returned.
+ * \returns The index of the element that was just pushed. If the operation
+ * failed, a negative value is returned.
  */
 VEC_API int
 vec_push(
@@ -365,7 +366,7 @@ vec_push(
 
   if (metadata->length == metadata->capacity) {
     if(vec_grow(v)) {
-      return 1;
+      return -1;
     } else {
       __SYNC_METADATA__(*v)
     }
@@ -377,8 +378,8 @@ vec_push(
   } else {
     memcpy(dst, val, metadata->elemsize);
   }
-  metadata->length++;
-  return 0;
+
+  return metadata->length++;
 }
 
 int
