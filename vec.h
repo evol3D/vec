@@ -158,6 +158,38 @@ vec_push(
   void *val);
 
 /*!
+ * \brief A function that copies the value at the end of a vector and removes
+ * it from the vector. If a copy function was passed while initializing the 
+ * vector, then this function is used. Otherwise, memcpy is used with a length 
+ * of `vec_meta.elemsize`
+ * NOTE: The destructor function is not called for the popped element. The
+ * receiving code is responsible for the destruction of the popped element.
+ *
+ *
+ * \param v Reference to the vector object
+ * \param out A pointer to the memory block at which the popped element will be
+ * copied
+ * 
+ * \returns An error code. If the operation was successful, then `0` is returned.
+ */
+VEC_API int
+vec_pop(
+  vec_t *v, 
+  void *out);
+
+/*!
+ * \brief A function that returns the last element in the vector.
+ *
+ * \param v Reference to the vector object
+ * 
+ * \returns Pointer to the last element in the vector. NULL if the vector is
+ * empty.
+ */
+VEC_API void *
+vec_last(
+    vec_t *v);
+
+/*!
  * \brief A function that returns the length of a vector
  *
  * \param v The vector object
@@ -347,6 +379,37 @@ vec_push(
   }
   metadata->length++;
   return 0;
+}
+
+int
+vec_pop(
+    vec_t *v, 
+    void *out)
+{
+  __GET_METADATA__(*v)
+
+  void *src = ((char *)*v) + ((metadata->length-1) * metadata->elemsize)
+  if (metadata->copy_fn) {
+    metadata->copy_fn(out, src);
+  } else {
+    memcpy(out, src, metadata->elemsize);
+  }
+  metadata->length--;
+
+  return 0;
+}
+
+void *
+vec_last(
+    vec_t *v)
+{
+  __GET_METADATA__(*v)
+
+  if(metadata->length == 0) {
+    return NULL;
+  }
+
+  return ((char *)*v) + ((metadata->length-1) * metadata->elemsize)
 }
 
 size_t
