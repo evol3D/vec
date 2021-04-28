@@ -163,13 +163,12 @@ vec_push(
  * it from the vector. If a copy function was passed while initializing the 
  * vector, then this function is used. Otherwise, memcpy is used with a length 
  * of `vec_meta.elemsize`
- * NOTE: The destructor function is not called for the popped element. The
- * receiving code is responsible for the destruction of the popped element.
- *
  *
  * \param v Reference to the vector object
  * \param out A pointer to the memory block at which the popped element will be
- * copied
+ * copied. If NULL is passed, then the element is destructed. Otherwise, the
+ * element is copied to `out` and the receiving code is responsible for its
+ * destruction.
  * 
  * \returns An error code. If the operation was successful, then `0` is returned.
  */
@@ -389,12 +388,18 @@ vec_pop(
 {
   __GET_METADATA__(*v)
 
-  void *src = ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
-
-  if (metadata->copy_fn) {
-    metadata->copy_fn(out, src);
+  if(out != NULL) {
+    void *src = ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
+    if (metadata->copy_fn) {
+      metadata->copy_fn(out, src);
+    } else {
+      memcpy(out, src, metadata->elemsize);
+    }
   } else {
-    memcpy(out, src, metadata->elemsize);
+    void *elem = ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
+    if (metadata->destr_fn) {
+      metadata->destr_fn(elem);
+    }
   }
 
   metadata->length--;
