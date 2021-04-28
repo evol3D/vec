@@ -90,10 +90,23 @@ vec_init_impl(
  * \brief Syntactic sugar for `vec_init_impl()`
  * \details Sample usage:
  * ```
- * vec_init(int, 0, 0)
+ * vec_init(int);                   // vec_init_impl(sizeof(int), NULL, NULL);
+ * vec_init(int, fn_destr);         // vec_init_impl(sizeof(int), NULL, fn_destr);
+ * vec_init(int, fn_cpy, fn_destr); // vec_init_impl(sizeof(int), fn_cpy, fn_destr);
  * ```
  */
-#define vec_init(type, copy, destr) vec_init_impl(sizeof(type), copy, destr)
+#define __vec_vargs_narg(...) __vec_vargs_narg_impl(__VA_ARGS__, __vec_vargs_rseq_n())
+#define __vec_vargs_narg_impl(...) __vec_vargs_arg_n(__VA_ARGS__)
+#define __vec_vargs_arg_n(_1, _2, _3, N, ...) N
+#define __vec_vargs_rseq_n() 3, 2, 1, 0
+
+#define __vec_cat_impl(a,b) a##b
+#define __vec_cat(a,b) __vec_cat_impl(a,b)
+
+#define vec_init(...) __vec_cat(__vec_init_, __vec_vargs_narg(__VA_ARGS__))(__VA_ARGS__)
+#define __vec_init_1(type) vec_init_impl(sizeof(type), NULL, NULL)
+#define __vec_init_2(type, destr) vec_init_impl(sizeof(type), NULL, destr)
+#define __vec_init_3(type, cpy, destr) vec_init_impl(sizeof(type), cpy, destr)
 
 /*!
  * \param v The vector that we want an iterator for
