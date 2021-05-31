@@ -200,7 +200,7 @@ vec_pop(
  */
 VEC_API void *
 vec_last(
-    vec_t *v);
+    vec_t v);
 
 /*!
  * \brief A function that returns the length of a vector
@@ -422,15 +422,15 @@ vec_pop(
 
 void *
 vec_last(
-    vec_t *v)
+    vec_t v)
 {
-  __GET_METADATA__(*v)
+  __GET_METADATA__(v)
 
   if(metadata->length == 0) {
     return NULL;
   }
 
-  return ((char *)*v) + ((metadata->length-1) * metadata->elemsize);
+  return ((char *)v) + ((metadata->length-1) * metadata->elemsize);
 }
 
 size_t
