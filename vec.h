@@ -172,6 +172,28 @@ vec_push(
   void *val);
 
 /*!
+ * \brief A function that appends the elements of an array to the end of a
+ * vector.  If a resize is needed but fails due to 'OOM' issues, then the
+ * vector is left unchanged and a non-zero is returned.
+ * *NOTE* The vector's copy function is not used; this is merely a memcpy
+ * operation. If a deep copy is needed, individually pushing the elements of
+ * the array is the way to go.
+ *
+ * \param v Reference to the vector object
+ * \param arr A pointer to the array that is to be copied to the end of the
+ * vector
+ * \param size Number of elements in the array
+ *
+ * \returns The index of the first element that was appended to the vector. If 
+ * the operation failed, a negative value is returned.
+ */
+VEC_API int
+vec_append(
+  vec_t *v,
+  void **arr,
+  size_t size);
+
+/*!
  * \brief A function that copies the value at the end of a vector and removes
  * it from the vector. If a copy function was passed while initializing the 
  * vector, then this function is used. Otherwise, memcpy is used with a length 
@@ -392,6 +414,27 @@ vec_push(
   }
 
   return metadata->length++;
+}
+
+VEC_API int
+vec_append(
+  vec_t *v,
+  void **arr,
+  size_t size)
+{
+  __GET_METADATA__(*v)
+  size_t old_len = metadata->length;
+  size_t req_len = old_len + size;
+
+  if(vec_setlen(v, req_len)) {
+    return -1;
+  }
+  __SYNC_METADATA__(*v)
+
+  void *dst = ((char *)*v) + (old_len * metadata->elemsize);
+  memcpy(dst, *arr, metadata->elemsize * size);
+
+  return old_len;
 }
 
 int
