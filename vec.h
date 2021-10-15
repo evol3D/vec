@@ -1,3 +1,4 @@
+#pragma once
 /*!
  * \file vec.h
  */
@@ -22,6 +23,12 @@
     #define VEC_API
 #endif
 
+#ifdef _WIN32
+#define __vec_align(x) __declspec(align(x))
+#else
+#define __vec_align(x) __attribute__((aligned(x)))
+#endif
+
 #ifndef VEC_INIT_CAP
 /*!
  * \brief Initial capacity that is first reserved when a vector is initialized
@@ -39,6 +46,7 @@
 #include <stddef.h>
 
 typedef void *vec_t;
+typedef void *svec_t;
 
 /*!
  * \brief For the sake of readability
@@ -48,6 +56,15 @@ typedef void *vec_t;
  * ```
  */
 #define vec(T) T*
+
+/*!
+ * \brief For the sake of readability
+ * \details Sample usage:
+ * ```
+ * svec(int) v = svec_init(int, { 0, 0 });
+ * ```
+ */
+#define svec(T) T*
 
 /*!
  * \brief Signature of a function that copies data from one address to another.
@@ -70,6 +87,26 @@ typedef void (*elem_copy)(void *dst, const void *src);
  * \param d Pointer to data that should be destroyed
  */
 typedef void (*elem_destr)(void *d);
+
+//! Metadata that is stored with a vector. Unique to each vector.
+struct vec_meta_t {
+  //! The number of elements in the vector.
+  size_t length;
+  //! The maximum length of the vector before it needs to be resized.
+  size_t capacity;
+  //! The size (in bytes) of memory that each element takes.
+  size_t elemsize;
+
+  enum {
+      EV_VEC_ALLOCATION_TYPE_STACK,
+      EV_VEC_ALLOCATION_TYPE_HEAP
+  } allocationType;
+
+  //! If set, the vector uses this function to copy new values into the vector.
+  elem_copy copy_fn;
+  //! If set, the vector uses this function to destroy stored values.
+  elem_destr destr_fn;
+};
 
 /*!
  * \param elemsize Memory (in bytes) that should be reserved per element in the vector
@@ -103,10 +140,41 @@ vec_init_impl(
 #define __vec_cat_impl(a,b) a##b
 #define __vec_cat(a,b) __vec_cat_impl(a,b)
 
+#define __vec_arr_size(...) sizeof(__VA_ARGS__)/sizeof((__VA_ARGS__)[0])
+
 #define vec_init(...) __vec_cat(__vec_init_, __vec_vargs_narg(__VA_ARGS__))(__VA_ARGS__)
 #define __vec_init_1(type) vec_init_impl(sizeof(type), NULL, NULL)
 #define __vec_init_2(type, destr) vec_init_impl(sizeof(type), NULL, destr)
 #define __vec_init_3(type, cpy, destr) vec_init_impl(sizeof(type), cpy, destr)
+
+#define svec_init(type, ...) __svec_init_impl(type, __vec_arr_size((type[])__VA_ARGS__), __VA_ARGS__)
+#define svec_init_w_size(type, size) __svec_init_w_size_impl(type, size)
+
+#define __svec_init_impl(type, size, ...)                                 \
+		(svec(type))&((struct {                                           \
+		  struct vec_meta_t meta;                                         \
+	 	  type data[size];                                                \
+	    }) {                                                              \
+	  	  .meta.length = size,                                            \
+	  	  .meta.capacity = size,                                          \
+	  	  .meta.elemsize = sizeof(type),                                  \
+	  	  .meta.allocationType = EV_VEC_ALLOCATION_TYPE_STACK,            \
+          .meta.copy_fn = 0,                                              \
+          .meta.destr_fn = 0,                                             \
+	  	  .data = __VA_ARGS__                                             \
+	    }).data
+
+#define __svec_init_w_size_impl(type, size)                               \
+		(svec(type))&((struct {                                                       \
+		  struct vec_meta_t meta;                                         \
+	 	  type data[size];                                                \
+	    }) {                                                              \
+	  	  .meta.length = 0,                                               \
+	  	  .meta.capacity = size,                                          \
+	  	  .meta.elemsize = sizeof(type),                                  \
+	  	  .meta.allocationType = EV_VEC_ALLOCATION_TYPE_STACK,            \
+          .data = { 0 }                                                   \
+	    }).data
 
 /*!
  * \param v The vector that we want an iterator for
@@ -302,23 +370,14 @@ vec_grow(
 #ifdef EV_VEC_IMPL
 #undef EV_VEC_IMPL
 
+#ifdef EV_VEC_API_CHECK
+#define API_CHECK(x) do { x; } while(0)
+#else
+#define API_CHECK(x)
+#endif
+
 #include <stdlib.h>
 #include <string.h>
-
-//! Metadata that is stored with a vector. Unique to each vector.
-struct vec_meta_t {
-  //! The number of elements in the vector.
-  size_t length;
-  //! The maximum length of the vector before it needs to be resized.
-  size_t capacity;
-  //! The size (in bytes) of memory that each element takes.
-  size_t elemsize;
-
-  //! If set, the vector uses this function to copy new values into the vector.
-  elem_copy copy_fn;
-  //! If set, the vector uses this function to destroy stored values.
-  elem_destr destr_fn;
-};
 
 #define vec_meta(v) \
   ((struct vec_meta_t *)v) - 1
@@ -413,7 +472,7 @@ vec_push(
     memcpy(dst, val, metadata->elemsize);
   }
 
-  return metadata->length++;
+  return (int)metadata->length++;
 }
 
 VEC_API int
@@ -434,7 +493,7 @@ vec_append(
   void *dst = ((char *)*v) + (old_len * metadata->elemsize);
   memcpy(dst, *arr, metadata->elemsize * size);
 
-  return old_len;
+  return (int)old_len;
 }
 
 int
