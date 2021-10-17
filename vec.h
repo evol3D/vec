@@ -1,9 +1,8 @@
-#pragma once
 /*!
  * \file vec.h
  */
-#ifndef EV_VEC_HEADER
-#define EV_VEC_HEADER
+#ifndef VEC_HEADER
+#define VEC_HEADER
 
 #ifdef VEC_DLL
     #if defined(_WINDOWS) || defined(_WIN32)
@@ -47,6 +46,13 @@
 
 typedef void *vec_t;
 typedef void *svec_t;
+
+typedef enum {
+  VEC_ERR_NONE = 0,
+
+  VEC_ERR_OOM = -1,
+
+} vec_error_t;
 
 /*!
  * \brief For the sake of readability
@@ -98,8 +104,8 @@ struct vec_meta_t {
   size_t elemsize;
 
   enum {
-      EV_VEC_ALLOCATION_TYPE_STACK,
-      EV_VEC_ALLOCATION_TYPE_HEAP
+      VEC_ALLOCATION_TYPE_STACK,
+      VEC_ALLOCATION_TYPE_HEAP
   } allocationType;
 
   //! If set, the vector uses this function to copy new values into the vector.
@@ -148,7 +154,7 @@ vec_init_impl(
 #define __vec_init_3(type, cpy, destr) vec_init_impl(sizeof(type), cpy, destr)
 
 #define svec_init(type, ...) __svec_init_impl(type, __vec_arr_size((type[])__VA_ARGS__), __VA_ARGS__)
-#define svec_init_w_size(type, size) __svec_init_w_size_impl(type, size)
+#define svec_init_w_cap(type, cap) __svec_init_w_cap_impl(type, cap)
 
 #define __svec_init_impl(type, size, ...)                                 \
 		(svec(type))&((struct {                                           \
@@ -158,21 +164,21 @@ vec_init_impl(
 	  	  .meta.length = size,                                            \
 	  	  .meta.capacity = size,                                          \
 	  	  .meta.elemsize = sizeof(type),                                  \
-	  	  .meta.allocationType = EV_VEC_ALLOCATION_TYPE_STACK,            \
+	  	  .meta.allocationType = VEC_ALLOCATION_TYPE_STACK,            \
           .meta.copy_fn = 0,                                              \
           .meta.destr_fn = 0,                                             \
 	  	  .data = __VA_ARGS__                                             \
 	    }).data
 
-#define __svec_init_w_size_impl(type, size)                               \
+#define __svec_init_w_cap_impl(type, cap)                               \
 		(svec(type))&((struct {                                                       \
 		  struct vec_meta_t meta;                                         \
-	 	  type data[size];                                                \
+	 	  type data[cap];                                                \
 	    }) {                                                              \
 	  	  .meta.length = 0,                                               \
-	  	  .meta.capacity = size,                                          \
+	  	  .meta.capacity = cap,                                          \
 	  	  .meta.elemsize = sizeof(type),                                  \
-	  	  .meta.allocationType = EV_VEC_ALLOCATION_TYPE_STACK,            \
+	  	  .meta.allocationType = VEC_ALLOCATION_TYPE_STACK,            \
           .data = { 0 }                                                   \
 	    }).data
 
@@ -214,6 +220,9 @@ vec_iter_next(
  * passed while initializing the vector, then this function is called on every
  * element before all reserved memory is freed.
  *
+ * *Note*: For stack-allocated vectors (`svec`), destructors are called for 
+ * elements but no memory is freed.
+ *
  * \param v The vector that is being destroyed
  */
 VEC_API void
@@ -225,14 +234,17 @@ vec_fini(
  * function was passed while initializing the vector, then this function is
  * called to copy the new element into the vector. Otherwise, memcpy is used
  * with a length of `vec_meta.elemsize`. If a resize is needed but fails due to
- * 'OOM' issues, then the vector is left unchanged and a non-zero is returned.
+ * 'OOM' issues, then the vector is left unchanged and VEC_ERR_OOM is returned.
+ *
+ * For `svec`, as long as the capacity is more than the current size, a push
+ * operation is permitted. Otherwise, the operation is treated as an OOM.
  *
  * \param v Reference to the vector object
  * \param val A pointer to the element that is to be copied to the end of the
  * vector
  *
  * \returns The index of the element that was just pushed. If the operation
- * failed, a negative value is returned.
+ * failed, a non-zero (vec_error_t) value is returned.
  */
 VEC_API int
 vec_push(
@@ -242,7 +254,12 @@ vec_push(
 /*!
  * \brief A function that appends the elements of an array to the end of a
  * vector.  If a resize is needed but fails due to 'OOM' issues, then the
- * vector is left unchanged and a non-zero is returned.
+ * vector is left unchanged and a VEC_ERR_OOM is returned.
+ *
+ * For `svec`, as long as the capacity is more than the current size by the
+ * desired amount, an append operation is permitted. Otherwise, the operation 
+ * is treated as an OOM.
+ *
  * *NOTE* The vector's copy function is not used; this is merely a memcpy
  * operation. If a deep copy is needed, individually pushing the elements of
  * the array is the way to go.
@@ -253,7 +270,7 @@ vec_push(
  * \param size Number of elements in the array
  *
  * \returns The index of the first element that was appended to the vector. If 
- * the operation failed, a negative value is returned.
+ * the operation failed, a non-zero (vec_error_t) value is returned.
  */
 VEC_API int
 vec_append(
@@ -273,9 +290,10 @@ vec_append(
  * element is copied to `out` and the receiving code is responsible for its
  * destruction.
  * 
- * \returns An error code. If the operation was successful, then `0` is returned.
+ * \returns An error code. If the operation was successful, then `VEC_ERR_NONE` 
+ * is returned.
  */
-VEC_API int
+VEC_API vec_error_t
 vec_pop(
   vec_t *v, 
   void *out);
@@ -333,12 +351,15 @@ vec_clear(
  * amended. Otherwise, the capacity is checked to make sure that there is enough
  * space for the new len.
  *
+ * For `svec`, if the `len` is more than the already allocated capacity, it is
+ * treated as an OOM.
+ *
  * \param v Reference to the vector object
  * \param len The desired new length
  *
- * \returns 0 on success
+ * \returns `VEC_ERR_NONE` on success
  */
-VEC_API int
+VEC_API vec_error_t
 vec_setlen(
   vec_t *v, 
   size_t len);
@@ -349,9 +370,11 @@ vec_setlen(
  * \param v Reference to the vector object
  * \param cap The desired new capacity
  *
- * \returns 0 on success
+ * For stack-allocated vectors, `VEC_ERR_OOM` is returned
+ *
+ * \returns `VEC_ERR_NONE` on success, `VEC_ERR_OOM` on OOM
  */
-VEC_API int
+VEC_API vec_error_t
 vec_setcapacity(
   vec_t *v, 
   size_t cap);
@@ -361,16 +384,16 @@ vec_setcapacity(
  *
  * \param Reference to the vector object
  *
- * \returns 0 on success
+ * \returns `VEC_ERR_NONE` on success
  */
-VEC_API int
+VEC_API vec_error_t
 vec_grow(
   vec_t *v);
 
-#ifdef EV_VEC_IMPL
-#undef EV_VEC_IMPL
+#ifdef VEC_IMPL
+#undef VEC_IMPL
 
-#ifdef EV_VEC_API_CHECK
+#ifdef VEC_API_CHECK
 #define API_CHECK(x) do { x; } while(0)
 #else
 #define API_CHECK(x)
@@ -403,6 +426,7 @@ vec_init_impl(
     .length   = 0,
     .capacity = VEC_INIT_CAP,
     .elemsize = elemsize,
+    .allocationType = VEC_ALLOCATION_TYPE_HEAP,
     .copy_fn  = copy,
     .destr_fn = destr,
   };
@@ -447,7 +471,9 @@ vec_fini(
       metadata->destr_fn(elem);
     }
   }
-  free(metadata);
+  if(metadata->allocationType == VEC_ALLOCATION_TYPE_HEAP) {
+    free(metadata);
+  }
 }
 
 int
@@ -458,8 +484,9 @@ vec_push(
   __GET_METADATA__(*v)
 
   if (metadata->length == metadata->capacity) {
-    if(vec_grow(v)) {
-      return -1;
+    vec_error_t grow_err = vec_grow(v);
+    if(grow_err) {
+      return grow_err;
     } else {
       __SYNC_METADATA__(*v)
     }
@@ -485,8 +512,9 @@ vec_append(
   size_t old_len = metadata->length;
   size_t req_len = old_len + size;
 
-  if(vec_setlen(v, req_len)) {
-    return -1;
+  vec_error_t setlen_err = vec_setlen(v, req_len);
+  if(setlen_err) {
+    return setlen_err;
   }
   __SYNC_METADATA__(*v)
 
@@ -496,7 +524,7 @@ vec_append(
   return (int)old_len;
 }
 
-int
+vec_error_t
 vec_pop(
     vec_t *v, 
     void *out)
@@ -519,7 +547,7 @@ vec_pop(
 
   metadata->length--;
 
-  return 0;
+  return VEC_ERR_NONE;
 }
 
 void *
@@ -568,7 +596,7 @@ vec_clear(
   return 0;
 }
 
-int
+vec_error_t
 vec_setlen(
     vec_t *v, 
     size_t len)
@@ -576,32 +604,37 @@ vec_setlen(
   __GET_METADATA__(*v)
 
   while(len > metadata->capacity) {
-    if(vec_grow(v)) {
-      return 1;
+    vec_error_t grow_err = vec_grow(v);
+    if(grow_err) {
+      return grow_err;
     }
     __SYNC_METADATA__(*v)
   }
 
   metadata->length = len;
-  return 0;
+  return VEC_ERR_NONE;
 }
 
-int
+vec_error_t
 vec_setcapacity(
     vec_t *v, 
     size_t cap)
 {
   __GET_METADATA__(*v)
 
+  if(meta->allocationType == VEC_ALLOCATION_TYPE_STACK) {
+    return VEC_ERR_OOM;
+  }
+
   if(metadata->capacity == cap) {
-    return 0;
+    return VEC_ERR_NONE;
   }
 
   void *buf = ((char *)(*v) - sizeof(struct vec_meta_t));
   void *tmp = realloc(buf, sizeof(struct vec_meta_t) + (cap * metadata->elemsize));
 
   if (!tmp) {
-    return 1;
+    return VEC_ERR_OOM;
   }
 
   if(buf != tmp) {
@@ -611,10 +644,10 @@ vec_setcapacity(
   }
 
   metadata->capacity = cap;
-  return 0;
+  return VEC_ERR_NONE;
 }
 
-int
+vec_error_t
 vec_grow(
     vec_t *v)
 {
