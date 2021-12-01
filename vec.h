@@ -390,8 +390,8 @@ VEC_API vec_error_t
 vec_grow(
   vec_t *v);
 
-#ifdef VEC_IMPL
-#undef VEC_IMPL
+#ifdef VEC_IMPLEMENTATION
+#undef VEC_IMPLEMENTATION
 
 #ifdef VEC_API_CHECK
 #define API_CHECK(x) do { x; } while(0)
