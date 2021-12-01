@@ -622,7 +622,7 @@ vec_setcapacity(
 {
   __GET_METADATA__(*v)
 
-  if(meta->allocationType == VEC_ALLOCATION_TYPE_STACK) {
+  if(metadata->allocationType == VEC_ALLOCATION_TYPE_STACK) {
     return VEC_ERR_OOM;
   }
 
